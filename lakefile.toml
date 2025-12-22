@@ -1,0 +1,10 @@
+name = "molib"
+version = "0.1.0"
+defaultTargets = ["molib"]
+
+[[lean_lib]]
+name = "Molib"
+
+[[lean_exe]]
+name = "molib"
+root = "Main"
