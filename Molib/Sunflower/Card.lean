@@ -2,7 +2,6 @@ module
 
 public import Mathlib.Algebra.Order.Interval.Set.SuccPred
 public import Mathlib.Data.Set.PowersetCard
-public import Mathlib.SetTheory.Cardinal.Arithmetic
 public import Molib.Sunflower.Basic
 
 @[expose] public section
@@ -91,9 +90,6 @@ private lemma sunflower_bounds_nat' {k r : ℕ} (family : Finset (Finset ℕ))
     (hₖ : ∀ S ∈ family, #S = k) (h : IsSunflowerFree family r) :
     #family ≤ maxSunflowerFreeCard k r :=
   le_csSup ⟨_, sunflower_upperbounds k r⟩ ⟨family, ⟨hₖ, h⟩, rfl⟩
-
-theorem exists_equiv_finset (α : Type u) [Infinite α] : Nonempty (Finset α ≃ α) :=
-  Quotient.exact (Cardinal.mk_finset_of_infinite α)
 
 theorem sunflower_bounds_nat {k r : ℕ} (family : Finset (Finset ℕ)) (hₖ : ∀ S ∈ family, #S ≤ k)
     (h : IsSunflowerFree family r) : #family ≤ maxSunflowerFreeCard k r := by
