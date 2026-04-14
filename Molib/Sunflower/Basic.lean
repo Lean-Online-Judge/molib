@@ -31,7 +31,7 @@ lemma k_le_1 (h₁ : ∀ S ∈ family, #S ≤ 1) (r : ℕ) : IsSunflowerFree fam
   exact Sd.trans Td.symm
 
 theorem main {k : ℕ} (hₖ : ∀ S ∈ family, #S ≤ k) {r : ℕ} (h : IsSunflowerFree family r) :
-    #family ≤ k ! * (r - 1)^k := by
+    #family ≤ k ! * (r - 1) ^ k := by
   induction k generalizing family with
   | zero =>
     simp only [Nat.factorial_zero, pow_zero, mul_one, Finset.card_le_one]
