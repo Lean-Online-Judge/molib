@@ -12,7 +12,7 @@ open scoped Finset Nat
 noncomputable def maxSunflowerFreeCard (k r : ℕ) : ℕ := sSup (Finset.card ''
   { family : Finset (Finset ℕ) | (∀ S ∈ family, #S = k) ∧ IsSunflowerFree family r })
 
-private lemma sunflower_upperbounds (k r : ℕ) : k ! * (r - 1)^k ∈ upperBounds (Finset.card ''
+private lemma sunflower_upperbounds (k r : ℕ) : k ! * (r - 1) ^ k ∈ upperBounds (Finset.card ''
   { family : Finset (Finset ℕ) | (∀ S ∈ family, #S = k) ∧ IsSunflowerFree family r }) := by
   intro n h
   simp only [Set.mem_image, Set.mem_setOf_eq] at h
@@ -21,10 +21,10 @@ private lemma sunflower_upperbounds (k r : ℕ) : k ! * (r - 1)^k ∈ upperBound
   peel hₖ
   exact Nat.le_of_eq this
 
-theorem sunflower_le (k r : ℕ) : maxSunflowerFreeCard k r ≤ k ! * (r - 1)^k :=
+theorem sunflower_le (k r : ℕ) : maxSunflowerFreeCard k r ≤ k ! * (r - 1) ^ k :=
   csSup_le' (sunflower_upperbounds k r)
 
-theorem sunflower_ge (k r : ℕ) [NeZero k] [NeZero r] : (r - 1)^k ≤ maxSunflowerFreeCard k r :=
+theorem sunflower_ge (k r : ℕ) [NeZero k] [NeZero r] : (r - 1) ^ k ≤ maxSunflowerFreeCard k r :=
   le_csSup ⟨_, sunflower_upperbounds k r⟩ <| (SunflowerLemma.lower k r).imp fun _ ↦ and_assoc.2
 
 theorem sunflower_k_eq_zero (r : ℕ) : maxSunflowerFreeCard 0 r = if r <= 1 then 0 else 1 := by
