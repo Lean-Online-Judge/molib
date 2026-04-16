@@ -1,7 +1,7 @@
 name = "molib"
 version = "0.1.0"
-keywors = ["math"]
-defaultTargets = ["molib"]
+keywords = ["math"]
+defaultTargets = ["Molib"]
 
 [leanOptions]
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`
@@ -12,7 +12,7 @@ maxSynthPendingDepth = 3
 [[require]]
 name = "mathlib"
 scope = "leanprover-community"
-rev = "v4.27.0"
+rev = "v4.29.0"
 
 [[lean_lib]]
 name = "Molib"
