@@ -2,6 +2,8 @@ name: Lean Action CI
 
 on:
   push:
+    branches:
+      - master
   pull_request:
   workflow_dispatch:
 
@@ -16,5 +18,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
-      - uses: leanprover/lean-action@v1
-      - uses: leanprover-community/docgen-action@v1
+
+      - name: Lean Action
+        uses: leanprover/lean-action@v1
+
+      - name: Docgen
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: leanprover-community/docgen-action@v1
