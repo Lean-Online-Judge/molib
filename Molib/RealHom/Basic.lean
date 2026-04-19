@@ -1,223 +1,237 @@
 module
 
-public import Mathlib
+public import Mathlib.Algebra.Module.LinearMap.Rat
+public import Mathlib.Analysis.RCLike.Lemmas
 
 @[expose] public section
 
 open Real Set Function Finset Rat
+open Bornology (IsBounded)
 
-def IsAdditive {α β : Type*} [Add α] [Add β] (f : α → β) : Prop :=
+variable {α β : Type*}
+
+def IsAdditive [Add α] [Add β] (f : α → β) : Prop :=
   ∀ x y, f (x + y) = f x + f y
 
 namespace IsAdditive
 
-theorem ofHom {α β : Type*} [AddZero α] [AddZero β] (f : α →+ β) :
+theorem ofHom [AddZero α] [AddZero β] (f : α →+ β) :
     IsAdditive f := AddMonoidHom.map_add f
 
-abbrev toHom {α β : Type*} [AddMonoid α] [AddGroup β] {f : α → β} (h : IsAdditive f) : α →+ β where
-  toFun := f
-  map_add' := h
-  map_zero' := by
-    have := h 0 0
-    simp only [add_zero, left_eq_add] at this
-    exact this
+abbrev toHom [AddZeroClass α] [AddGroup β] {f : α → β} (hf : IsAdditive f) : α →+ β :=
+    .mk' f hf
 
-theorem add_additive {f g : ℝ → ℝ} (hf : IsAdditive f) (hg : IsAdditive g) :
-    IsAdditive (f + g) := by
-  intro _ _
-  dsimp
-  rw [hf, hg]
-  ring
+theorem add [AddZeroClass α] [AddCommGroup β] {f g : α → β} (hf : IsAdditive f)
+  (hg : IsAdditive g) : IsAdditive (f + g) := ofHom (hf.toHom + hg.toHom)
 
-theorem neg_additive {f : ℝ → ℝ} (hf : IsAdditive f) : IsAdditive (- f) := by
-  intro x y
-  dsimp
-  rw [hf x y, neg_add]
+theorem neg [AddZeroClass α] [AddCommGroup β] {f : α → β} (hf : IsAdditive f) :
+  IsAdditive (-f) := ofHom (-hf.toHom)
 
 @[simp]
-theorem of_const_zero : IsAdditive (0 : ℝ → ℝ) := by
+theorem of_const_zero [Add α] [AddZeroClass β] : IsAdditive (0 : α → β) := by
   simp [IsAdditive]
 
 @[simp]
-theorem of_const_mul {r : ℝ} : IsAdditive (fun x ↦ r * x) := by
-  intro _ _
-  ring
+theorem of_const_mul [Mul α] [Add α] [LeftDistribClass α] {r : α} : IsAdditive (fun x ↦ r * x) :=
+  left_distrib r
 
 @[simp]
-theorem of_mul_const {r : ℝ} : IsAdditive (fun x ↦ x * r) := by
-  intro _ _
-  ring
+theorem of_mul_const [Mul α] [Add α] [RightDistribClass α] {r : α} : IsAdditive (fun x ↦ x * r) :=
+  fun _ _ ↦ right_distrib _ _ r
 
 @[simp]
-theorem id : IsAdditive (id : ℝ → ℝ) := by
-  intro _ _
-  rfl
+theorem id [Add α] : IsAdditive (@id α) := fun _ _ ↦ rfl
 
 @[simp]
-theorem of_neg : IsAdditive (fun x ↦ -x) := by
-  intro _ _
-  ring
+theorem of_neg [SubtractionCommMonoid α] : IsAdditive (fun x ↦ -x) := neg_add
 
-variable {f : ℝ → ℝ}
+variable {f : α → β}
 
 @[simp]
-theorem zero (hf : IsAdditive f) : f 0 = 0 := by
-  have := hf 0 0
-  simp_all
+theorem map_zero [AddZeroClass α] [AddGroup β] (hf : IsAdditive f) : f 0 = 0 :=
+  _root_.map_zero hf.toHom
 
-theorem sum_finset (hf : IsAdditive f) {ι : Type*} (r : ι → ℝ) (s : Finset ι) :
-    ∑ x ∈ s, f (r x) = f (∑ x ∈ s, r x) := by
-  classical
-  induction s using Finset.induction with
-  | empty => simp [zero hf]
-  | insert i s is hs => rw [sum_insert is, sum_insert is, hs, hf (r i)]
+theorem map_sum_finset [AddCommMonoid α] [AddCommGroup β] (hf : IsAdditive f) {ι : Type*}
+    (r : ι → α) (s : Finset ι) : ∑ x ∈ s, f (r x) = f (∑ x ∈ s, r x) := (map_sum hf.toHom r s).symm
 
-theorem nat_mul (hf : IsAdditive f) (n : ℕ) (x : ℝ) : f (n * x) = n * f x := by
-  calc
-    f (n * x) = f (∑ i ∈ range n, x) := by simp
-      _ = ∑ i ∈ range n, f x := by rw [sum_finset hf]
-      _ = n * f x := by simp
+theorem map_nat_mul [NonAssocSemiring α] [NonAssocRing β] (hf : IsAdditive f) (n : ℕ) (x : α) :
+    f (n * x) = n * f x := by
+  simp only [← nsmul_eq_mul]
+  exact map_nsmul hf.toHom n x
 
-theorem mul_nat (hf : IsAdditive f) (n : ℕ) (x : ℝ) : f (x * n) = f x * n := by
-  rw [mul_comm, nat_mul hf, mul_comm (f x)]
+theorem map_mul_nat [NonAssocSemiring α] [NonAssocRing β] (hf : IsAdditive f) (n : ℕ) (x : α) :
+    f (x * n) = f x * n := by
+  simp only [← nsmul_eq_mul']
+  exact map_nsmul hf.toHom n x
 
-theorem neg (hf : IsAdditive f) (x : ℝ) : f (- x) = - f x := by
-  have := hf x (-x)
-  simp only [add_neg_cancel, zero hf] at this
-  rw [← add_zero (- f x), this]
-  ring
+theorem map_neg [AddGroup α] [AddGroup β] (hf : IsAdditive f) (x : α) : f (-x) = -f x :=
+  _root_.map_neg hf.toHom x
 
-theorem int_mul (hf : IsAdditive f) (n : ℤ) (x : ℝ) : f (n * x) = n * f x := by
-  by_cases! hn : 0 ≤ n
-  · have : (↑n : ℝ) = n.toNat := by
-      rw [← Int.toNat_of_nonneg hn]
-      rfl
-    rw [this, nat_mul hf]
-  have : (↑n : ℝ) = -((-(↑n : ℤ)).toNat : ℝ) := by
-      apply Eq.trans (b := -↑((-n).toNat : ℤ))
-      · rw [Int.toNat_of_nonneg (by simp [hn.le])]
-        simp
-      · simp [-Int.ofNat_toNat]
-  rw [this, neg_mul, neg_mul, ← nat_mul hf, neg hf]
+theorem map_int_mul [NonAssocRing α] [NonAssocRing β] (hf : IsAdditive f) (n : ℤ) (x : α) :
+    f (n * x) = n * f x := by
+  simp only [← zsmul_eq_mul]
+  exact map_zsmul hf.toHom n x
 
-theorem mul_int (hf : IsAdditive f) (n : ℤ) (x : ℝ) : f (x * n) = f x * n := by
-  rw [mul_comm, int_mul hf, mul_comm]
+theorem map_mul_int [NonAssocRing α] [NonAssocRing β] (hf : IsAdditive f) (n : ℤ) (x : α) :
+    f (x * n) = f x * n := by
+  simp only [← zsmul_eq_mul']
+  exact map_zsmul hf.toHom n x
 
-theorem inv_nat_mul (hf : IsAdditive f) {n : ℕ} (hn : n ≠ 0) (x : ℝ) :
-    f ((↑n : ℝ)⁻¹ * x) = (↑n : ℝ)⁻¹ * f x := by
-  have : (↑n : ℝ) ≠ 0 := by simpa
-  apply (mul_right_inj' this).mp
-  rw [← nat_mul hf, ← mul_assoc, ← mul_assoc, mul_inv_cancel₀ this, one_mul, one_mul]
+theorem map_rat_mul [DivisionRing α] [DivisionRing β] [CharZero α] [CharZero β]
+    (hf : IsAdditive f) (r : ℚ) (x : α) : f (r * x) = r * f x := by
+  simp only [← Rat.smul_def]
+  exact map_rat_smul hf.toHom r x
 
-theorem rat_mul (hf : IsAdditive f) (r : ℚ) (x : ℝ) : f (r * x) = r * f x := by
-  by_cases hr : r = 0
-  · simp [hr, zero hf]
-  have : (↑r.den : ℝ) ≠ 0 := by simp
-  apply (mul_right_inj' this).mp
-  have (a b : ℚ) : (↑(a * b) : ℝ) = (↑a : ℝ) * b := by
-    exact cast_mul a b
-  have (m : ℕ) : (↑m : ℝ) = (↑(↑m : ℚ) : ℝ) := ext_cauchy rfl
-  rw [← nat_mul hf, ← mul_assoc, ← mul_assoc, this, ← cast_mul,
-    den_mul_eq_num, cast_intCast, int_mul hf]
+theorem ofNat [AddCommMonoid α] [AddCommGroup β] (hf : IsAdditive f) : IsLinearMap ℕ f :=
+  hf.toHom.toNatLinearMap.isLinear
 
-theorem ofNat (hf : IsAdditive f) (n : ℕ) : f n = n * f 1 := by
-  rw [← mul_one n, Nat.cast_mul, nat_mul hf, Nat.cast_one, mul_one]
+theorem ofInt [AddCommGroup α] [AddCommGroup β] (hf : IsAdditive f) : IsLinearMap ℤ f :=
+  hf.toHom.toIntLinearMap.isLinear
 
-theorem ofInt (hf : IsAdditive f) (n : ℤ) : f n = n * f 1 := by
-  rw [← mul_one n, Int.cast_mul, int_mul hf, Int.cast_one, mul_one]
-
-theorem ofRat (hf : IsAdditive f) (r : ℚ) : f r = r * f 1 := by
-  rw [← mul_one r, cast_mul, rat_mul hf, cast_one, mul_one]
-
--- Major TODO : If the graph of an additive function is not dense, it is linear. -/
-/-
-theorem linear_of_not_dense (hf : IsAdditive f) (h : ¬ Dense (graph f)) (x : ℝ) :
-    f x = x * f 1 := by
-  sorry
--/
-
---to mathlib?
-theorem _root_.monotone_iff_neg_antitone {α β : Type*} [Preorder α] [AddGroup β] [Preorder β]
-    [AddLeftMono β] [AddRightMono β] {f : α → β} : Monotone f ↔ Antitone (-f) :=
-  ⟨fun h _ _ ab ↦ neg_le_neg_iff.mpr <| h ab, fun h _ _ ab ↦ neg_le_neg_iff.mp <| h ab⟩
-
---to mathlib?
-theorem _root_.antitone_iff_neg_monotone {α β : Type*} [Preorder α] [AddGroup β] [Preorder β]
-    [AddLeftMono β] [AddRightMono β] {f : α → β} : Antitone f ↔ Monotone (-f) :=
-  ⟨fun h _ _ ab ↦ neg_le_neg_iff.mpr <| h ab, fun h _ _ ab ↦ neg_le_neg_iff.mp <| h ab⟩
-
-private lemma ofMonotone_spec (hf : IsAdditive f) (fm : Monotone f) (x : ℝ) (op : 0 ≤ f 1) :
-    f x = x * f 1 := by
-  apply le_antisymm
-  · apply le_of_forall_pos_le_add (fun e epos ↦ ?_)
-    suffices ∃ q : ℚ, x ≤ q ∧ f q ≤ x * f 1 + e by
-      obtain ⟨p, hp⟩ := this
-      apply le_trans <| fm hp.1
-      exact hp.2
-    by_cases ot : f 1 = 0
-    · rw [ot]
-      obtain ⟨q, hq⟩ := exists_rat_gt x
-      refine ⟨q, hq.le, ?_⟩
-      rw [ofRat hf, ot]
-      simp [epos.le]
-    have : x < x + e / f 1 := by
-      simp only [lt_add_iff_pos_right]
-      exact div_pos epos (by order)
-    obtain ⟨q, hq, hq'⟩ := exists_rat_btwn this
-    refine ⟨q, hq.le, ?_⟩
-    rw [ofRat hf]
-    calc
-      _ ≤ (x + e / f 1) * f 1 := by gcongr
-      _ = x * f 1 + e := by
-        rw [add_mul]
-        simp only [add_right_inj]
-        exact div_mul_cancel₀ e ot
-  apply le_of_forall_pos_le_add (fun e epos ↦ ?_)
-  suffices ∃ q : ℚ, q ≤ x ∧ x * f 1 ≤ f q + e by
-    obtain ⟨p, hp⟩ := this
-    exact le_trans hp.2 <| add_le_add_left (fm hp.1) e
-  rcases eq_or_ne (f 1) 0 with ot|ot
-  · rw [ot]
-    obtain ⟨q, hq⟩ := exists_rat_lt x
-    refine ⟨q, hq.le, ?_⟩
-    rw [ofRat hf, ot]
-    simp [epos.le]
-  have : x - e / f 1 < x := by
-    simp only [sub_lt_self_iff]
-    exact div_pos epos (by order)
-  obtain ⟨q, hq, hq'⟩ := exists_rat_btwn this
-  refine ⟨q, hq'.le, ?_⟩
-  rw [ofRat hf]
-  replace hq : x < q + e / f 1 := lt_add_of_tsub_lt_right hq
-  calc
-    _ ≤ (q + e / f 1) * f 1 := by gcongr
-    _ = q * f 1 + e := by
-      rw [add_mul]
-      simp only [add_right_inj]
-      exact div_mul_cancel₀ e ot
-
-theorem ofMonotone (hf : IsAdditive f) (fm : Monotone f) (x : ℝ) :
-    f x = x * f 1 := by
-  rcases le_or_gt 0 (f 1) with h|h
-  · exact ofMonotone_spec hf fm x h
-  let g : ℝ → ℝ := f + (fun x ↦ x * - f 1)
-  have hg : Monotone g := by
-    intro x y xy
-    unfold g
-    dsimp
-    gcongr
-    · exact fm xy
-    · simp [h.le]
-  replace hg := ofMonotone_spec (add_additive hf of_mul_const) hg x
-  simp at hg
-  linarith
-
-theorem ofAntitone (hf : IsAdditive f) (fm : Antitone f) (x : ℝ) :
-    f x = x * f 1 := by
-  have := ofMonotone (neg_additive hf) (antitone_iff_neg_monotone.mp fm) x
-  simp only [Pi.neg_apply, mul_neg, neg_inj] at this
-  exact this
-
---TODO: Above can be generalised to monotone (antitone) on some interval
+theorem ofRat [DivisionRing α] [DivisionRing β] [CharZero α] [CharZero β] (hf : IsAdditive f) :
+  IsLinearMap ℚ f := hf.toHom.toRatLinearMap.isLinear
 
 end IsAdditive
+
+--to mathlib?
+theorem monotone_iff_neg_antitone {α β : Type*} [Preorder α] [AddGroup β] [Preorder β]
+    [AddLeftMono β] [AddRightMono β] {f : α → β} : Monotone f ↔ Antitone (-f) :=
+  ⟨fun h ↦ h.neg, fun h ↦ by convert h.neg; simp⟩
+
+--to mathlib?
+theorem antitone_iff_neg_monotone {α β : Type*} [Preorder α] [AddGroup β] [Preorder β]
+    [AddLeftMono β] [AddRightMono β] {f : α → β} : Antitone f ↔ Monotone (-f) :=
+  ⟨fun h ↦ h.neg, fun h ↦ by convert h.neg; simp⟩
+
+lemma real_span_subset_closure_rat_span {V : Type u} [AddCommGroup V] [TopologicalSpace V]
+    [Module ℚ V] [Module ℝ V] [ContinuousAdd V] [ContinuousSMul ℚ V] [ContinuousSMul ℝ V]
+    (s : Set V) : (Submodule.span ℝ s : Set V) ⊆ (Submodule.span ℚ s).topologicalClosure := by
+  intro x xsp
+  simp only [SetLike.mem_coe] at xsp ⊢
+  induction xsp using Submodule.span_induction with
+  | mem y ys => exact Submodule.le_topologicalClosure _ <| Submodule.mem_span_of_mem ys
+  | zero => exact zero_mem _
+  | add _ _ _ _ hy hz => exact add_mem hy hz
+  | smul μ y h₁ h₂ =>
+    let f := ContinuousLinearMap.toSpanSingleton ℝ y
+    have : MapsTo f (range Rat.cast) (Submodule.span ℚ s).topologicalClosure := by
+      rintro _ ⟨q, rfl⟩
+      simp only [f, ContinuousLinearMap.toSpanSingleton_apply]
+      convert Submodule.smul_mem _ q h₂ using 1
+      exact cast_smul_eq_qsmul ℝ q y
+    have := f.continuous.continuousWithinAt.mem_closure (denseRange_cast μ) this
+    simpa using this
+
+namespace IsAdditive.Real
+
+variable {f : ℝ → ℝ} (hf : IsAdditive f)
+
+include hf
+
+theorem linear_of_not_dense (h : ¬Dense (graph f)) : IsLinearMap ℝ f := by
+  suffices l₁ : ∀ x, f x = x * f 1 by
+    refine ⟨hf, fun x y ↦ ?_⟩
+    simp only [smul_eq_mul, l₁ y, l₁ (x * y)]
+    exact mul_assoc x y (f 1)
+  intro x
+  contrapose h
+  simp only [dense_iff_closure_eq, ← univ_subset_iff]
+  let ℚ₁ : Submodule ℚ (ℝ × ℝ) := ℚ ∙ (1, f 1)
+  let ℝ₁ : Submodule ℝ (ℝ × ℝ) := ℝ ∙ (1, f 1)
+  let ℚ₂ : Submodule ℚ (ℝ × ℝ) := ℚ ∙ (x, f x)
+  let ℝ₂ : Submodule ℝ (ℝ × ℝ) := ℝ ∙ (x, f x)
+  have ℚℝ₁ : (ℝ₁ : Set (ℝ × ℝ)) ⊆ ℚ₁.topologicalClosure := real_span_subset_closure_rat_span _
+  have ℚℝ₂ : (ℝ₂ : Set (ℝ × ℝ)) ⊆ ℚ₂.topologicalClosure := real_span_subset_closure_rat_span _
+  calc
+    _ ⊆ ((ℝ₁ ⊔ ℝ₂ : Submodule ℝ (ℝ × ℝ)) : Set (ℝ × ℝ)) := by
+      simp only [univ_subset_iff, Submodule.coe_eq_univ, ℝ₁, ℝ₂, ← Submodule.span_union,
+        singleton_union]
+      have : LinearIndepOn ℝ _root_.id {(1, f 1), (x, f x)} := by
+        refine linearIndepOn_id_pair ?_ ?_
+        · simp
+        · intro y
+          contrapose h
+          simp only [Prod.smul_mk, smul_eq_mul, mul_one, Prod.mk.injEq] at h
+          exact (h.1 ▸ h.2).symm
+      convert this.span_eq_top_of_card_eq_finrank' ?_
+      · ext
+        simp
+      · simp only [Fintype.card_ofFinset, toFinset_singleton, Module.finrank_prod,
+          Module.finrank_self, Nat.reduceAdd]
+        refine card_pair ?_
+        contrapose h
+        simp at h
+        simp [← h.1]
+    _ ⊆ ((ℚ₁.topologicalClosure ⊔ ℚ₂.topologicalClosure : Submodule ℚ (ℝ × ℝ)) : Set (ℝ × ℝ)) := by
+      intro v hv
+      simp only [SetLike.mem_coe, Submodule.mem_sup] at hv ⊢
+      rcases hv with ⟨v₁, hv₁, v₂, hv₂, rfl⟩
+      exact ⟨v₁, ℚℝ₁ hv₁, v₂, ℚℝ₂ hv₂, rfl⟩
+    _ ⊆ hf.toHom.toRatLinearMap.graph.topologicalClosure := by
+      refine (sup_le (closure_mono ?_) (closure_mono ?_)
+        : ℚ₁.topologicalClosure ⊔ ℚ₂.topologicalClosure ≤
+          hf.toHom.toRatLinearMap.graph.topologicalClosure) <;> (
+        change ℚ ∙ _ ≤ hf.toHom.toRatLinearMap.graph
+        simp
+      )
+    _ = _ := by
+      refine congrArg closure ?_
+      ext
+      simp [graph, Eq.comm]
+
+theorem linear_of_locally_not_dense {U : Set ℝ} (iU : (interior U).Nonempty) (h : ¬Dense (f '' U)) :
+    IsLinearMap ℝ f := by
+  refine linear_of_not_dense hf ?_
+  contrapose h
+  grw [← image_mono (f := f) (interior_subset (s := U))]
+  have op := isOpen_interior (s := U)
+  generalize interior U = U at iU op
+  let g := U.restrict f
+  have hg : Dense (graph g) := by
+    have op' : IsOpen (U ×ˢ (@Set.univ ℝ)) := op.prod isOpen_univ
+    let φ : C(U × ℝ, ℝ × ℝ) := .prodMap (.restrict U (.id ℝ)) (.id ℝ)
+    have φi : Topology.IsInducing φ := .prodMap .subtypeVal .id
+    have opφ : IsOpen (Set.range φ) := by
+      convert op'
+      ext ⟨x, y⟩
+      simp [φ]
+    exact h.preimage (φi.isOpenMap opφ)
+  let ψ := @ContinuousMap.snd U ℝ _ _
+  have : Nonempty U := nonempty_subtype.2 iU
+  have ψsurj : Surjective ψ := Prod.snd_surjective
+  convert ψsurj.denseRange.dense_image ψ.continuous hg
+  ext
+  simp [g, ψ]
+
+theorem linear_of_locally_bounded {U : Set ℝ} (iU : (interior U).Nonempty)
+    (fb : IsBounded (f '' U)) : IsLinearMap ℝ f :=
+  linear_of_locally_not_dense hf iU fun d ↦ NormedSpace.unbounded_univ ℝ ℝ
+    (d.closure_eq ▸ fb.closure)
+
+theorem linear_of_locally_monotone {U : Set ℝ} (iU : (interior U).Nonempty)
+    (fm : MonotoneOn f U) : IsLinearMap ℝ f := by
+  rcases iU with ⟨x, xU⟩
+  rw [mem_interior_iff_mem_nhds] at xU
+  rcases exists_Icc_mem_subset_of_mem_nhds xU with ⟨l, r, -, lrx, lrU⟩
+  rw [← mem_interior_iff_mem_nhds] at lrx
+  refine linear_of_locally_bounded hf ⟨x, lrx⟩
+    ((Metric.isBounded_Icc _ _).subset (fm.mono lrU).image_Icc_subset)
+
+theorem linear_of_locally_antitone {U : Set ℝ} (iU : (interior U).Nonempty)
+    (fm : AntitoneOn f U) : IsLinearMap ℝ f := by
+  rcases iU with ⟨x, xU⟩
+  rw [mem_interior_iff_mem_nhds] at xU
+  rcases exists_Icc_mem_subset_of_mem_nhds xU with ⟨l, r, -, lrx, lrU⟩
+  rw [← mem_interior_iff_mem_nhds] at lrx
+  refine linear_of_locally_bounded hf ⟨x, lrx⟩
+    ((Metric.isBounded_Icc _ _).subset (fm.mono lrU).image_Icc_subset)
+
+theorem ofMonotone (fm : Monotone f) : IsLinearMap ℝ f := by
+  refine linear_of_locally_monotone hf ?_ (fm.monotoneOn univ)
+  simp only [interior_univ, Set.univ_nonempty]
+
+theorem ofAntitone (fm : Antitone f) : IsLinearMap ℝ f := by
+  refine linear_of_locally_antitone hf ?_ (fm.antitoneOn univ)
+  simp only [interior_univ, Set.univ_nonempty]
+
+end IsAdditive.Real
